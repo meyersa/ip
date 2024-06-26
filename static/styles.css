@@ -83,3 +83,23 @@ p {
   font-size: 0.75em;
   z-index: 30;
 }
+
+@media screen and (max-width: 700px) {
+  h1 {
+    font-size: 3rem;
+
+  }
+  .floater {
+    max-width: calc(100dvw - 2em - 2em);
+    box-shadow: none;
+  }
+  p {
+    text-align: center;
+    font-size: 0.6rem;
+  }
+  .footer {
+    width: 100%; 
+
+  }
+
+}
