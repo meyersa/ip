@@ -68,21 +68,3 @@ Override the app entrypoint or port:
 docker run --rm -p 8000:8000 -e APP_MODULE=main:app ivt-py:runtime
 docker run --rm -p 9000:9000 -e PORT=9000 ivt-py:runtime
 ```
-
-## CI Images
-
-The GitHub Actions workflow builds and scans the `dev` and `runtime` targets, builds the `test` target for validation, and publishes images from `main` or `v*.*.*` tags.
-
-Runtime images are tagged with:
-
-```text
-latest
-sha-<commit>
-<version>
-<major>.<minor>
-<major>
-```
-
-Version tags come from Git tags, not package-manager metadata. For example, pushing `v1.2.3` publishes runtime tags `1.2.3`, `1.2`, and `1`.
-
-The dev image is published as `dev`.
