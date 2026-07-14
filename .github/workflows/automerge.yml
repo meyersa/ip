@@ -1,0 +1,17 @@
+---
+name: Auto Merge
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    uses: meyersa/iac-ci/.github/workflows/reusable-automerge.yml@main
