@@ -81,31 +81,59 @@ jobs:
           token: ${{ secrets.IAC_CD_TOKEN }}
           path: iac-cd
 
-      - name: Update whoami image
+      - name: Find and update deployment image
         id: image
         working-directory: iac-cd
         shell: bash
         env:
+          IMAGE_REPOSITORY: ghcr.io/${{ github.repository }}
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
         run: |
+          set -euo pipefail
           short_sha="${GITHUB_SHA::7}"
-          grep -q '^[[:space:]]*image:' applications/compose.whoami.yml
-          sed -i "s|^[[:space:]]*image:.*|      image: $IMAGE|" applications/compose.whoami.yml
-          grep -F "image: $IMAGE" applications/compose.whoami.yml
+
+          mapfile -t manifests < <(
+            git grep -l -F "$IMAGE_REPOSITORY:" -- '*.yml' '*.yaml' || true
+          )
+
+          if (( ${#manifests[@]} == 0 )); then
+            echo "No YAML manifest references $IMAGE_REPOSITORY" >&2
+            exit 1
+          fi
+
+          search_repository="${IMAGE_REPOSITORY//./\\.}"
+          sed -i -E \
+            "s|${search_repository}:[^[:space:]\"']+|${IMAGE}|g" \
+            "${manifests[@]}"
+
+          git grep -n -F "$IMAGE" -- "${manifests[@]}"
           echo "short-sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Create deployment pull request
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.IAC_CD_TOKEN }}
-          path: iac-cd
-          base: main
-          branch: deploy/app-ivt-py
-          delete-branch: true
-          labels: automerge
-          add-paths: applications/compose.whoami.yml
-          commit-message: "deploy app-ivt-py ${{ steps.image.outputs.short-sha }}"
-          title: "Deploy app-ivt-py ${{ steps.image.outputs.short-sha }}"
-          body: |
-            Updates `whoami-frontend` to the image built from
-            [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+        working-directory: iac-cd
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.IAC_CD_TOKEN }}
+          IMAGE: ${{ steps.image.outputs.image }}
+          SHORT_SHA: ${{ steps.image.outputs.short-sha }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          image_name="${GITHUB_REPOSITORY#*/}"
+          branch="deploy/${image_name}-${SHORT_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -u
+          git commit -m "deploy ${image_name} ${SHORT_SHA}"
+          git push origin "$branch"
+
+          gh pr create \
+            --repo meyersa/iac-cd \
+            --base main \
+            --head "$branch" \
+            --title "Deploy ${image_name} ${SHORT_SHA}" \
+            --body "Updates ${IMAGE} from ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SOURCE_SHA}." \
+            --label automerge
