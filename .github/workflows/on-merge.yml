@@ -38,6 +38,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix=sha-
+            type=raw,value=${{ github.sha }}
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=latest
 
@@ -66,3 +67,45 @@ jobs:
           cache-from: type=gha,scope=runtime
           cache-to: type=gha,scope=runtime,mode=max,ignore-error=true
           platforms: linux/amd64,linux/arm64/v8
+
+  update-deployment:
+    name: Open deployment PR
+    runs-on: ubuntu-latest
+    needs: publish
+
+    steps:
+      - name: Checkout deployment repository
+        uses: actions/checkout@v4
+        with:
+          repository: meyersa/iac-cd
+          token: ${{ secrets.IAC_CD_TOKEN }}
+          path: iac-cd
+
+      - name: Update whoami image
+        id: image
+        working-directory: iac-cd
+        shell: bash
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          grep -q '^[[:space:]]*image:' applications/compose.whoami.yml
+          sed -i "s|^[[:space:]]*image:.*|      image: $IMAGE|" applications/compose.whoami.yml
+          grep -F "image: $IMAGE" applications/compose.whoami.yml
+          echo "short-sha=$short_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create deployment pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.IAC_CD_TOKEN }}
+          path: iac-cd
+          base: main
+          branch: deploy/app-ivt-py
+          delete-branch: true
+          labels: automerge
+          add-paths: applications/compose.whoami.yml
+          commit-message: "deploy app-ivt-py ${{ steps.image.outputs.short-sha }}"
+          title: "Deploy app-ivt-py ${{ steps.image.outputs.short-sha }}"
+          body: |
+            Updates `whoami-frontend` to the image built from
+            [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
