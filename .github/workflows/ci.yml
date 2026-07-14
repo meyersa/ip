@@ -25,15 +25,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: python
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
 
   docker:
     name: Build, validate, scan, and publish image
@@ -63,7 +63,7 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Scan repository filesystem
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -72,7 +72,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Scan dev image
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}:ci-dev
           severity: CRITICAL,HIGH
@@ -100,7 +100,7 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
 
       - name: Scan runtime image
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository }}:ci-runtime
           severity: CRITICAL,HIGH
